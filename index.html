@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TPV - Super El Mancheguito</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <!-- jsPDF for ticket & invoice generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --trello-bg: #0079bf;
+            --trello-list-bg: #f1f2f4;
+            --trello-card-bg: #ffffff;
+            --trello-text: #172b4d;
+            --trello-text-light: #5e6c84;
+            --trello-primary: #0c66e4;
+            --trello-primary-hover: #0052cc;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--trello-bg);
+            background-image: linear-gradient(to right bottom, #0079bf, #005a8f);
+            color: var(--trello-text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.6); }
+
+        .trello-header {
+            background-color: rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(4px);
+            color: white;
+        }
+
+        .trello-btn {
+            background-color: rgba(255, 255, 255, 0.2);
+            transition: background-color 0.2s;
+        }
+        .trello-btn:hover { background-color: rgba(255, 255, 255, 0.3); }
+
+        .trello-list {
+            background-color: var(--trello-list-bg);
+            border-radius: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            width: 300px;
+            min-width: 300px;
+            max-height: 100%;
+            box-shadow: 0 1px 1px rgba(9,30,66,0.25);
+        }
+
+        .trello-card {
+            background-color: var(--trello-card-bg);
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 1px rgba(9,30,66,0.25);
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            border: 2px solid transparent;
+        }
+        .trello-card:hover { background-color: #f4f5f7; border-color: var(--trello-primary); }
+        .trello-card:active { transform: scale(0.98); }
+
+        .sidebar-overlay { background-color: rgba(0,0,0,0.6); backdrop-filter: blur(2px); }
+        
+        .sidebar {
+            background-color: #ffffff;
+            color: var(--trello-text);
+            width: 280px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 50;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        .sidebar.closed { transform: translateX(-100%); }
+
+        .nav-item {
+            color: var(--trello-text);
+            transition: background 0.2s, color 0.2s;
+        }
+        .nav-item:hover, .nav-item.active {
+            background-color: #e9f2ff;
+            color: var(--trello-primary);
+            font-weight: 600;
+        }
+
+        .keypad-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+        }
+        .keypad-btn {
+            background-color: white;
+            border: 1px solid #dfe1e6;
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+            font-weight: 600;
+            color: var(--trello-text);
+            box-shadow: 0 1px 1px rgba(9,30,66,0.15);
+            transition: background 0.1s;
+        }
+        .keypad-btn:hover { background-color: #f4f5f7; }
+        .keypad-btn:active { background-color: #e9f2ff; color: var(--trello-primary); border-color: var(--trello-primary); }
+        .keypad-btn.action { background-color: #e9f2ff; color: var(--trello-primary); }
+        .keypad-btn.pay-cash { background-color: #22a06b; color: white; border: none; grid-column: span 2; }
+        .keypad-btn.pay-cash:hover { background-color: #1f845a; }
+        .keypad-btn.pay-card { background-color: var(--trello-primary); color: white; border: none; grid-column: span 2; }
+        .keypad-btn.pay-card:hover { background-color: var(--trello-primary-hover); }
+
+        .content-section {
+            height: 100%;
+            background-color: #ffffff;
+            border-radius: 0.75rem 0.75rem 0 0;
+            margin: 0 0.5rem;
+            padding: 1rem;
+            overflow-y: auto;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+        }
+        .content-section:not(.active) { display: none !important; }
+        #punto-venta.content-section { background-color: transparent; margin: 0; padding: 0; box-shadow: none; border-radius: 0; }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #dfe1e6; }
+        .data-table th { background-color: #f4f5f7; font-weight: 600; color: var(--trello-text-light); font-size: 0.85rem; text-transform: uppercase; }
+
+        .modal {
+            position: fixed; inset: 0; z-index: 1000;
+            background: rgba(9, 30, 66, 0.54);
+            display: flex; justify-content: center; align-items: flex-start;
+            padding-top: 3rem; opacity: 0; visibility: hidden; transition: opacity 0.2s;
+        }
+        .modal.show { opacity: 1; visibility: visible; }
+        .modal-content {
+            background: white; border-radius: 0.5rem; padding: 1.5rem;
+            width: 90%; max-width: 400px; box-shadow: 0 8px 16px rgba(9, 30, 66, 0.25);
+            transform: translateY(-20px); transition: transform 0.2s;
+        }
+        .modal.show .modal-content { transform: translateY(0); }
+
+        /* iPad/iPhone demo & diagnostics helpers */
+        #ios-tools-btn { display:none; }
+        body.ios-device #ios-tools-btn { display:flex; }
+        .ios-safe-top { padding-top: env(safe-area-inset-top); }
+        .ios-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        @media (max-width: 640px) {
+            .content-section { margin: 0; border-radius: 0; padding: .75rem; }
+            .trello-header { min-height: 3.5rem; }
+            button, input, select, textarea { min-height: 40px; }
+        }
+        @media print {
+            body > *:not(#tpv-print-frame) { display:none !important; }
+        }
+    </style>
+<link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+    <meta name="theme-color" content="#0079bf">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TPV Mancheguito">
+</head>
+<body>
+
+    <header class="trello-header h-14 px-3 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2 flex-1">
+            <button class="trello-btn w-9 h-9 rounded flex items-center justify-center shrink-0" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="font-bold text-base md:text-lg flex items-center gap-2 px-1 truncate">
+                <i class="fas fa-trello"></i> <span id="app-title" class="truncate">El Mancheguito</span>
+            </div>
+            <!-- Search bar now fully responsive on iPhone -->
+            <div class="relative ml-1 flex-1 max-w-[200px] md:max-w-xs">
+                <i class="fas fa-search absolute left-2.5 top-1/2 transform -translate-y-1/2 text-white/70 text-xs"></i>
+                <input type="text" id="campo-codigo-barras" onkeydown="gestionarEscaneoCodigoBarras(event)" placeholder="Buscar / SKU..." 
+                       class="bg-white/20 hover:bg-white/30 focus:bg-white focus:text-gray-800 text-white placeholder-white/70 rounded px-7 py-1.5 text-xs md:text-sm outline-none w-full transition-all">
+            </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs shrink-0">
+            <span class="hidden sm:inline bg-white/20 px-2 py-1 rounded"><span id="fecha-actual"></span></span>
+            <button id="ios-tools-btn" class="trello-btn px-2.5 py-1 rounded items-center gap-1.5 font-medium" onclick="mostrarDiagnosticoIPad()" title="Diagnóstico iPhone/iPad">
+                <i class="fas fa-mobile-alt"></i><span class="hidden sm:inline">iPad</span>
+            </button>
+            <button class="trello-btn px-2.5 py-1 rounded flex items-center gap-1.5 font-medium" onclick="toggleSidebar()">
+                <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs"><i class="fas fa-user"></i></div>
+                <span id="display-usuario-actual" class="hidden sm:inline">Admin</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Global Alert / Message Box -->
+    <div id="alerta-global" class="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none text-sm">
+        Mensaje
+    </div>
+
+    <div class="flex flex-1 relative overflow-hidden">
+        
+        <!-- Sidebar Menu -->
+        <div id="sidebar-overlay" class="fixed inset-0 sidebar-overlay hidden z-40" onclick="toggleSidebar()"></div>
+        <aside id="sidebar" class="sidebar closed absolute inset-y-0 left-0 flex flex-col z-50">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <span class="font-bold text-gray-700">Menú Principal</span>
+                <button onclick="toggleSidebar()" class="text-gray-500 hover:text-gray-800 p-2"><i class="fas fa-times"></i></button>
+            </div>
+            <nav class="flex-1 overflow-y-auto p-2 space-y-1">
+                <a href="#" class="nav-item active rounded px-3 py-2.5 flex items-center gap-3 text-sm font-medium" data-section="punto-venta"><i class="fas fa-chalkboard fa-fw text-blue-600"></i> Tablero de Ventas</a>
+                <a href="#" class="nav-item rounded px-3 py-2.5 flex items-center gap-3 text-sm font-medium" data-section="dashboard"><i class="fas fa-chart-line fa-fw text-blue-600"></i> Dashboard</a>
+                <a href="#" class="nav-item rounded px-3 py-2.5 flex items-center gap-3 text-sm font-medium" data-section="inventario"><i class="fas fa-boxes fa-fw text-blue-600"></i> Inventario & Stock</a>
+                <a href="#" class="nav-item rounded px-3 py-2.5 flex items-center gap-3 text-sm font-medium" data-section="productos"><i class="fas fa-tags fa-fw text-blue-600"></i> Gestión de Productos</a>
+                <a href="#" class="nav-item rounded px-3 py-2.5 flex items-center gap-3 text-sm font-medium" data-section="historial-ventas"><i class="fas fa-history fa-fw text-blue-600"></i> Historial Tickets</a>
+                <a href="#" class="nav-item rounded px-3 py-2.5 flex items-center gap-3 text-sm font-medium" data-section="facturas"><i class="fas fa-file-invoice fa-fw text-blue-600"></i> Generar Facturas</a>
+                <a href="#" class="nav-item rounded px-3 py-2.5 flex items-center gap-3 text-sm font-medium" data-section="arqueo-caja"><i class="fas fa-cash-register fa-fw text-blue-600"></i> Arqueo de Caja</a>
+                <a href="#" class="nav-item rounded px-3 py-2.5 flex items-center gap-3 text-sm font-medium" data-section="configuracion"><i class="fas fa-cog fa-fw text-blue-600"></i> Configuración</a>
+            </nav>
+            <div class="p-4 border-t border-gray-200">
+                <button class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-medium py-2 rounded text-sm transition-colors" onclick="cerrarSesion()">
+                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col overflow-hidden w-full relative pt-2">
+            
+            <!-- SECTION: PUNTO DE VENTA (TRELLO BOARD STYLE) -->
+            <div id="punto-venta" class="content-section active h-full flex flex-col md:flex-row overflow-hidden pb-2 px-2 md:px-3 gap-3">
+                
+                <!-- Board: Product Categories (Lists) -->
+                <div id="trello-board" class="flex-1 flex overflow-x-auto overflow-y-hidden gap-3 pb-2 items-start trello-list-container">
+                    <!-- Dynamic categories generated here -->
+                </div>
+
+                <!-- Fixed List: The Cart / Ticket -->
+                <div class="trello-list w-full md:w-[350px] shrink-0 shadow-lg border border-gray-300/20 bg-[#f1f2f4]">
+                    <div class="px-3 py-2.5 flex justify-between items-center text-gray-800 border-b border-gray-300">
+                        <span class="font-bold text-sm">Ticket Actual</span>
+                        <button class="text-gray-400 hover:text-red-500 p-1" onclick="confirmarVaciarCesta()" title="Vaciar"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    
+                    <div id="articulos-cesta" class="flex-1 overflow-y-auto p-2 space-y-2">
+                        <div class="text-center text-gray-400 text-sm mt-10 italic">La cesta está vacía</div>
+                    </div>
+
+                    <div class="p-3 bg-white rounded-b-xl border-t border-gray-200 shadow-inner">
+                        <div class="text-xs text-gray-600 space-y-1 mb-2 px-1">
+                            <div class="flex justify-between"><span>Base imponible:</span><span id="subtotal">0.00 €</span></div>
+                            <div class="flex justify-between text-blue-600"><span>Desc. (<span id="display-porcentaje-descuento">0</span>%):</span><span id="cantidad-descuento">-0.00 €</span></div>
+                            <div class="flex justify-between"><span>IVA:</span><span id="cantidad-iva">0.00 €</span></div>
+                            <div class="flex justify-between font-bold text-base text-gray-800 pt-1 border-t"><span>Total:</span><span id="cantidad-total">0.00 €</span></div>
+                        </div>
+
+                        <!-- Keypad connected to scanner / search & actions -->
+                        <div class="mb-2 p-2 rounded border border-blue-100 bg-blue-50 flex items-center justify-between text-xs">
+                            <span class="text-blue-700 font-medium"><i class="fas fa-calculator"></i> Cantidad / peso</span>
+                            <strong id="cantidad-pendiente-display" class="text-blue-800">1</strong>
+                        </div>
+                        <div class="keypad-grid mt-2 text-sm">
+                            <button class="keypad-btn" onclick="handleKeypadInput('7')">7</button>
+                            <button class="keypad-btn" onclick="handleKeypadInput('8')">8</button>
+                            <button class="keypad-btn" onclick="handleKeypadInput('9')">9</button>
+                            <button class="keypad-btn action" onclick="aplicarDescuento(10)">-10%</button>
+                            
+                            <button class="keypad-btn" onclick="handleKeypadInput('4')">4</button>
+                            <button class="keypad-btn" onclick="handleKeypadInput('5')">5</button>
+                            <button class="keypad-btn" onclick="handleKeypadInput('6')">6</button>
+                            <button class="keypad-btn action" onclick="handleKeypadInput('C')"><i class="fas fa-backspace"></i></button>
+                            
+                            <button class="keypad-btn" onclick="handleKeypadInput('1')">1</button>
+                            <button class="keypad-btn" onclick="handleKeypadInput('2')">2</button>
+                            <button class="keypad-btn" onclick="handleKeypadInput('3')">3</button>
+                            <button class="keypad-btn action" onclick="imprimirTicket()"><i class="fas fa-print"></i></button>
+                            
+                            <button class="keypad-btn" onclick="handleKeypadInput('0')">0</button>
+                            <button class="keypad-btn" onclick="handleKeypadInput('.')">.</button>
+                            <button class="keypad-btn action col-span-2" onclick="simularBuscar()"><i class="fas fa-search"></i> Buscar</button>
+
+                            <button class="keypad-btn pay-cash mt-1" onclick="procesarVenta('cash')"><i class="fas fa-money-bill-wave"></i> Efectivo</button>
+                            <button class="keypad-btn pay-card mt-1" onclick="procesarVenta('card')"><i class="fas fa-credit-card"></i> Tarjeta</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION: INVENTARIO -->
+            <div id="inventario" class="content-section">
+                <h2 class="text-xl md:text-2xl font-bold mb-4"><i class="fas fa-boxes text-blue-600"></i> Inventario & Stock</h2>
+                <div class="mb-4">
+                    <input type="text" id="buscar-en-inventario" placeholder="Buscar producto en inventario..." class="w-full md:w-1/2 p-2.5 border rounded text-sm shadow-sm focus:ring-2 focus:ring-blue-400 outline-none" oninput="renderizarListaInventario()">
+                </div>
+                <div class="overflow-x-auto bg-white rounded shadow-sm border border-gray-200">
+                    <table class="data-table">
+                        <thead><tr><th>ID</th><th>Nombre</th><th>Stock Actual</th><th>Acciones</th></tr></thead>
+                        <tbody id="cuerpo-tabla-inventario"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECTION: DASHBOARD -->
+            <div id="dashboard" class="content-section">
+                <h2 class="text-xl md:text-2xl font-bold mb-6"><i class="fas fa-chart-line text-blue-600"></i> Dashboard</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl"><i class="fas fa-euro-sign"></i></div>
+                        <div><p class="text-xs text-gray-500">Ventas Hoy</p><p class="text-xl md:text-2xl font-bold" id="dash-ventas-hoy">0.00 €</p></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xl"><i class="fas fa-receipt"></i></div>
+                        <div><p class="text-xs text-gray-500">Tickets Emitidos</p><p class="text-xl md:text-2xl font-bold" id="dash-tickets">0</p></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div><p class="text-xs text-gray-500">Alertas Stock</p><p class="text-xl md:text-2xl font-bold" id="dash-stock">0</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION: PRODUCTOS -->
+            <div id="productos" class="content-section">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl md:text-2xl font-bold"><i class="fas fa-tags text-blue-600"></i> Productos</h2>
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded text-sm font-medium shadow-sm" onclick="abrirModalProducto()"><i class="fas fa-plus"></i> Nuevo</button>
+                </div>
+                <div class="overflow-x-auto bg-white rounded shadow-sm border border-gray-200">
+                    <table class="data-table">
+                        <thead><tr><th>ID</th><th>Nombre</th><th>Categoría</th><th>Precio (IVA incl.)</th><th>IVA</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla-productos"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECTION: HISTORIAL VENTAS -->
+            <div id="historial-ventas" class="content-section">
+                <h2 class="text-xl md:text-2xl font-bold mb-6"><i class="fas fa-history text-blue-600"></i> Historial de Ventas</h2>
+                <div class="overflow-x-auto bg-white rounded shadow-sm border border-gray-200">
+                    <table class="data-table">
+                        <thead><tr><th>Ticket ID</th><th>Fecha</th><th>Método</th><th>Total</th></tr></thead>
+                        <tbody id="tabla-historial"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECTION: FACTURAS -->
+            <div id="facturas" class="content-section">
+                <h2 class="text-xl md:text-2xl font-bold mb-2"><i class="fas fa-file-invoice text-blue-600"></i> Generación de Facturas</h2>
+                <p class="text-xs md:text-sm text-gray-500 mb-6">Seleccione una venta reciente para convertirla en factura PDF.</p>
+                <div class="overflow-x-auto bg-white rounded shadow-sm border border-gray-200">
+                    <table class="data-table">
+                        <thead><tr><th>Ticket ID</th><th>Fecha</th><th>Total</th><th>Acción</th></tr></thead>
+                        <tbody id="tabla-facturas"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECTION: ARQUEO DE CAJA -->
+            <div id="arqueo-caja" class="content-section">
+                <h2 class="text-xl md:text-2xl font-bold mb-6"><i class="fas fa-cash-register text-blue-600"></i> Arqueo de Caja</h2>
+                <div class="bg-white p-5 rounded shadow-sm border border-gray-200 max-w-lg">
+                    <div class="space-y-3 mb-6 text-sm">
+                        <div class="flex justify-between"><span class="text-gray-600">Ventas en Efectivo:</span> <span class="font-bold" id="arq-efectivo">0.00 €</span></div>
+                        <div class="flex justify-between border-b pb-3"><span class="text-gray-600">Ventas con Tarjeta:</span> <span class="font-bold" id="arq-tarjeta">0.00 €</span></div>
+                        <div class="flex justify-between text-lg font-bold text-blue-600"><span>Total Teórico:</span> <span id="arq-total">0.00 €</span></div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-xs font-bold mb-1">Efectivo real en caja (€)</label>
+                        <input type="number" id="arq-real" class="w-full p-2.5 border rounded outline-none focus:ring-2 focus:ring-blue-500 text-lg" placeholder="0.00" oninput="calcularDescuadre()">
+                    </div>
+                    <div class="p-3 rounded mb-4 text-center font-bold text-sm bg-gray-100" id="arq-resultado">Descuadre: 0.00 €</div>
+                    <button class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded shadow-sm text-sm" onclick="cerrarCaja()">Confirmar Cierre de Caja</button>
+                </div>
+            </div>
+
+            <!-- SECTION: CONFIGURACION -->
+            <div id="configuracion" class="content-section">
+                <h2 class="text-xl md:text-2xl font-bold mb-6"><i class="fas fa-cog text-blue-600"></i> Configuración del Negocio</h2>
+                <div class="bg-white p-5 rounded shadow-sm border border-gray-200 max-w-2xl space-y-4 text-sm">
+                    <div><label class="block text-gray-700 text-xs font-bold mb-1">Nombre Comercial</label><input type="text" id="conf-nombre" class="w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div><label class="block text-gray-700 text-xs font-bold mb-1">NIF/CIF</label><input type="text" id="conf-nif" class="w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div><label class="block text-gray-700 text-xs font-bold mb-1">Dirección</label><input type="text" id="conf-direccion" class="w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div class="border-t pt-4 mt-4">
+                        <h3 class="font-bold text-gray-800 mb-2"><i class="fas fa-weight-hanging text-blue-600"></i> Báscula CAS — conexión por cable</h3>
+                        <p class="text-xs text-gray-500 mb-3">Para la CAS de la foto, se prioriza RS-232 mediante un adaptador USB/RS-232. El protocolo CAS usa ASCII y admite formatos de 10/22 bytes; 9600 8N1 es una configuración habitual. Ajusta la velocidad si tu báscula está configurada de otra forma.</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <select id="conf-serial-baud" class="p-2 border rounded text-xs">
+                                <option value="9600">9600 baudios</option>
+                                <option value="19200">19200 baudios</option>
+                                <option value="38400">38400 baudios</option>
+                                <option value="57600">57600 baudios</option>
+                                <option value="115200">115200 baudios</option>
+                            </select>
+                            <select id="conf-serial-formato" class="p-2 border rounded text-xs">
+                                <option value="10">CAS 10 bytes</option>
+                                <option value="22">CAS 22 bytes</option>
+                                <option value="auto">Automático</option>
+                            </select>
+                            <select id="conf-serial-paridad" class="p-2 border rounded text-xs">
+                                <option value="none">Sin paridad</option>
+                                <option value="even">Paridad par</option>
+                                <option value="odd">Paridad impar</option>
+                            </select>
+                            <select id="conf-serial-stop" class="p-2 border rounded text-xs">
+                                <option value="1">1 bit de parada</option>
+                                <option value="2">2 bits de parada</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded font-medium text-xs" onclick="conectarBasculaSerie()"><i class="fas fa-plug"></i> Conectar CAS por USB/RS-232</button>
+                            <button class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded font-medium text-xs" onclick="desconectarBasculaSerie()">Desconectar cable</button>
+                            <span id="estado-bascula-serie" class="px-2 py-2 rounded bg-gray-100 text-gray-600 text-xs">Cable desconectado</span>
+                        </div>
+                    </div>
+                    <div class="border-t pt-4 mt-4">
+                        <h3 class="font-bold text-gray-800 mb-2"><i class="fas fa-bluetooth-b text-blue-600"></i> Bluetooth (alternativo)</h3>
+                        <p class="text-xs text-gray-500 mb-3">Se mantiene como alternativa si utilizas un adaptador Bluetooth que exponga el protocolo de la báscula.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <input type="text" id="conf-ble-service" placeholder="UUID servicio (opcional)" class="p-2 border rounded text-xs">
+                            <input type="text" id="conf-ble-characteristic" placeholder="UUID característica (opcional)" class="p-2 border rounded text-xs">
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button class="bg-gray-700 hover:bg-gray-800 text-white px-3 py-2 rounded font-medium text-xs" onclick="conectarBasculaBluetooth()"><i class="fas fa-bluetooth-b"></i> Conectar Bluetooth</button>
+                            <button class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded font-medium text-xs" onclick="desconectarBasculaBluetooth()">Desconectar Bluetooth</button>
+                            <span id="estado-bascula" class="px-2 py-2 rounded bg-gray-100 text-gray-600 text-xs">Bluetooth desconectado</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-2 rounded bg-blue-50 text-blue-800 text-sm flex justify-between"><span>Peso leído:</span><strong id="peso-bascula">0,000 kg</strong></div>
+                    <div class="border-t pt-4 mt-4">
+                        <h3 class="font-bold text-gray-800 mb-2"><i class="fas fa-shield-alt text-blue-600"></i> Copias de seguridad</h3>
+                        <p class="text-xs text-gray-500 mb-3">Se guarda una copia diaria de artículos, stock, ventas, configuración y registro de modificaciones. También se crea una copia antes de cada cierre de caja.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                            <label class="flex items-center gap-2 p-2 rounded border bg-gray-50 text-xs"><input type="checkbox" id="conf-backup-diario" class="accent-blue-600"> Copia diaria automática mientras el TPV esté abierto</label>
+                            <label class="flex items-center gap-2 p-2 rounded border bg-gray-50 text-xs"><input type="checkbox" id="conf-backup-descarga-cierre" class="accent-blue-600"> Descargar copia al cerrar caja</label>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded font-medium text-xs" onclick="crearYDescargarBackup('manual')"><i class="fas fa-download"></i> Crear y descargar copia ahora</button>
+                            <button class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded font-medium text-xs" onclick="document.getElementById('input-restaurar-backup').click()"><i class="fas fa-upload"></i> Recuperar copia descargada</button>
+                            <input type="file" id="input-restaurar-backup" accept="application/json,.json" class="hidden" onchange="restaurarBackupDesdeArchivo(event)">
+                        </div>
+                        <div class="p-3 rounded bg-gray-50 border text-xs text-gray-600 space-y-1">
+                            <div class="flex justify-between"><span>Última copia:</span><strong id="backup-ultima-fecha">Nunca</strong></div>
+                            <div class="flex justify-between"><span>Modificaciones registradas:</span><strong id="backup-total-cambios">0</strong></div>
+                        </div>
+                        <div class="mt-3 p-3 rounded bg-amber-50 text-amber-800 text-xs">
+                            <strong>Envío a Gmail/nube:</strong> el navegador puede descargar la copia automáticamente, pero el envío silencioso a Gmail o a una nube requiere autorización de la cuenta y normalmente un servicio OAuth/backend. Se deja preparado el sistema de copias para conectar ese servicio sin perder datos.
+                        </div>
+                    </div>
+                    <div class="border-t pt-4 mt-4">
+                        <h3 class="font-bold text-gray-800 mb-2"><i class="fas fa-print text-blue-600"></i> Impresión de tickets</h3>
+                        <p class="text-xs text-gray-500">Tras cobrar en efectivo o tarjeta aparecerá la opción de imprimir. La impresora se selecciona mediante el diálogo de impresión del sistema.</p>
+                    </div>
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded font-medium mt-2 transition-colors" onclick="guardarConfig()">Guardar Cambios</button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="modal-inicio-sesion" class="modal show bg-gray-900/90 z-[9999] opacity-100 visible">
+        <div class="modal-content text-center transform translate-y-10">
+            <div class="text-blue-600 text-3xl mb-3"><i class="fas fa-trello"></i></div>
+            <h2 class="text-xl font-bold mb-5 text-gray-800">El Mancheguito TPV</h2>
+            <div class="space-y-3 text-sm">
+                <input type="text" id="campo-usuario" placeholder="Usuario (admin)" class="w-full p-2.5 border rounded bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="password" id="campo-contrasena" placeholder="Contraseña (adminpassword)" class="w-full p-2.5 border rounded bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
+                <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-2.5 rounded transition-colors" onclick="gestionarInicioSesion()">
+                    Iniciar Sesión
+                </button>
+                <p id="error-inicio-sesion" class="text-red-500 text-xs h-4"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="modal-confirmacion" class="modal">
+        <div class="modal-content text-center">
+            <h3 id="titulo-confirmacion" class="text-base font-bold mb-2">Confirmar</h3>
+            <p id="mensaje-confirmacion" class="text-gray-600 mb-5 text-sm">¿Está seguro?</p>
+            <div class="flex gap-3 justify-center text-sm">
+                <button id="btn-confirmar-si" class="bg-blue-600 text-white px-5 py-2 rounded font-medium hover:bg-blue-700">Sí</button>
+                <button id="btn-confirmar-no" class="bg-gray-200 text-gray-800 px-5 py-2 rounded font-medium hover:bg-gray-300">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Modal -->
+    <div id="modal-producto" class="modal">
+        <div class="modal-content text-left text-sm">
+            <h3 class="text-base font-bold mb-3" id="titulo-modal-producto">Nuevo Producto</h3>
+            <div class="space-y-2.5">
+                <input type="hidden" id="prod-id">
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">Nombre</label><input type="text" id="prod-nombre" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">Categoría</label><input type="text" id="prod-categoria" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">Precio de venta (IVA incluido)</label><input type="number" step="0.001" id="prod-precio" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">IVA (%)</label><input type="number" step="0.01" min="0" max="100" id="prod-iva" value="21" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500"><p class="text-[10px] text-gray-500 mt-1">El precio introducido ya incluye el IVA. Por defecto 21%.</p></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">Unidad de venta</label>
+                    <select id="prod-unidad" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="ud">Unidad</option><option value="kg">Kilogramo (kg)</option>
+                    </select>
+                    <p class="text-[10px] text-gray-500 mt-1">En kg, el precio es €/kg y el peso puede venir de la báscula.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 justify-end mt-5">
+                <button class="bg-gray-200 text-gray-800 px-3.5 py-1.5 rounded font-medium hover:bg-gray-300 text-xs" onclick="cerrarModal('modal-producto')">Cancelar</button>
+                <button class="bg-blue-600 text-white px-3.5 py-1.5 rounded font-medium hover:bg-blue-700 text-xs" onclick="guardarProducto()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Modal -->
+    <div id="modal-factura" class="modal">
+        <div class="modal-content text-left text-sm">
+            <h3 class="text-base font-bold mb-3">Datos de Facturación</h3>
+            <p class="text-xs text-gray-500 mb-3">Generando factura para el Ticket <span id="factura-ticket-id" class="font-bold"></span></p>
+            <div class="space-y-2.5">
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">Nombre / Empresa</label><input type="text" id="fact-cliente" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">NIF/CIF</label><input type="text" id="fact-nif" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">Dirección Completa</label><input type="text" id="fact-direccion" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">Teléfono <span class="font-normal text-gray-400">(opcional)</span></label><input type="tel" id="fact-telefono" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej. 600 123 456"></div>
+                <div><label class="block text-xs font-bold text-gray-700 mb-1">Correo electrónico <span class="font-normal text-gray-400">(opcional)</span></label><input type="email" id="fact-email" class="w-full p-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="cliente@ejemplo.com"></div>
+            </div>
+            <div class="flex gap-3 justify-end mt-5">
+                <button class="bg-gray-200 text-gray-800 px-3.5 py-1.5 rounded font-medium hover:bg-gray-300 text-xs" onclick="cerrarModal('modal-factura')">Cancelar</button>
+                <button class="bg-blue-600 text-white px-3.5 py-1.5 rounded font-medium hover:bg-blue-700 text-xs" onclick="generarPDFfactura()"><i class="fas fa-file-pdf"></i> Generar PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Ticket Modal -->
+    <div id="modal-ticket" class="modal">
+        <div class="modal-content text-center">
+            <div class="text-green-600 text-3xl mb-2"><i class="fas fa-receipt"></i></div>
+            <h3 class="text-lg font-bold mb-1">Venta realizada</h3>
+            <p class="text-gray-600 text-sm mb-4">¿Quieres imprimir el ticket ahora?</p>
+            <div class="flex gap-2 justify-center">
+                <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold text-sm" onclick="imprimirTicketUltimaVenta()"><i class="fas fa-print"></i> Imprimir ticket</button>
+                <button class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded font-medium text-sm" onclick="cerrarModal('modal-ticket')">Ahora no</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- iPhone/iPad diagnostics modal -->
+    <div id="modal-ios-diagnostico" class="modal">
+        <div class="modal-content text-left text-sm" style="max-width:520px;">
+            <h3 class="text-base font-bold mb-2"><i class="fas fa-mobile-alt text-blue-600"></i> Compatibilidad iPhone / iPad</h3>
+            <p class="text-xs text-gray-500 mb-3">Comprueba desde el propio TPV qué funciones puede usar este dispositivo. Los accesorios nativos se integrarán en la versión iOS cuando se conozca el modelo exacto.</p>
+            <div id="ios-diagnostico-lista" class="space-y-2"></div>
+            <div class="flex gap-2 justify-end mt-4">
+                <button class="bg-gray-200 text-gray-800 px-3 py-2 rounded font-medium text-xs" onclick="cerrarModal('modal-ios-diagnostico')">Cerrar</button>
+                <button class="bg-blue-600 text-white px-3 py-2 rounded font-medium text-xs" onclick="window.print()"><i class="fas fa-print"></i> Probar impresión</button>
+            </div>
+        </div>
+    </div>
+
+        // --- iOS/iPadOS compatibility helpers ---
+        function detectarDispositivoApple() {
+            const ua = navigator.userAgent || '';
+            const iOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            if (iOS) document.body.classList.add('ios-device');
+            return iOS;
+        }
+
+        function estadoCompatibilidad(nombre, ok, detalle) {
+            const icon = ok ? 'fa-check-circle text-green-600' : 'fa-exclamation-triangle text-amber-600';
+            return `<div class="flex items-start gap-2 p-2 bg-gray-50 rounded border"><i class="fas ${icon} mt-0.5"></i><div><div class="font-semibold text-xs">${nombre}</div><div class="text-[11px] text-gray-500">${detalle}</div></div></div>`;
+        }
+
+        function mostrarDiagnosticoIPad() {
+            const lista = document.getElementById('ios-diagnostico-lista');
+            if (!lista) return;
+            const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            const bluetooth = !!navigator.bluetooth;
+            const serial = 'serial' in navigator;
+            const storage = (() => { try { const k='__tpv_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; } catch(e) { return false; }})();
+            const print = typeof window.print === 'function';
+            const online = navigator.onLine;
+            lista.innerHTML = [
+                estadoCompatibilidad('TPV web / PWA', true, standalone ? 'Abierto como aplicación desde la pantalla de inicio.' : 'Abierto en Safari. Puedes añadirlo a la pantalla de inicio.'),
+                estadoCompatibilidad('Almacenamiento del TPV', storage, storage ? 'localStorage disponible; las copias de seguridad siguen funcionando.' : 'El almacenamiento local no está disponible.'),
+                estadoCompatibilidad('Impresión', print, print ? 'El iPhone/iPad puede abrir el diálogo de impresión del sistema. Para impresora térmica directa necesitaremos AirPrint o integración nativa según modelo.' : 'La función de impresión no está disponible.'),
+                estadoCompatibilidad('Bluetooth web', bluetooth, bluetooth ? 'El navegador expone Web Bluetooth. Hay que probar el dispositivo concreto.' : 'Safari/iPadOS no expone esta API en este entorno. Para una báscula Bluetooth directa usaremos la versión nativa iOS.'),
+                estadoCompatibilidad('Puerto serie web', serial, serial ? 'El navegador expone Web Serial. Hay que probar adaptador y báscula.' : 'No disponible en Safari/iPadOS. La conexión CAS RS-232/USB requerirá integración nativa en la app iOS.'),
+                estadoCompatibilidad('Internet', online, online ? 'Conectado. Los recursos externos del TPV están disponibles.' : 'Sin conexión. El TPV puede conservar parte del shell, pero esta versión aún carga librerías externas desde CDN.')
+            ].join('');
+            abrirModal('modal-ios-diagnostico');
+        }
+
+        detectarDispositivoApple();
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+        }
+
+    <script>
+        // --- PERSISTENT STORAGE SETUP (localStorage) ---
+        let productos = JSON.parse(localStorage.getItem('mancheguito_productos')) || [
+            { id: '1', name: 'Leche Entera 1L', category: 'Lácteos', price: 1.10, unit: 'ud' },
+            { id: '2', name: 'Queso Manchego', category: 'Lácteos', price: 5.50, unit: 'ud' },
+            { id: '3', name: 'Pan de Molde', category: 'Panadería', price: 1.50, unit: 'ud' },
+            { id: '4', name: 'Barra Artesanal', category: 'Panadería', price: 0.80, unit: 'ud' },
+            { id: '5', name: 'Plátano Canarias', category: 'Frutas', price: 1.99, unit: 'kg' },
+            { id: '6', name: 'Tomate Ensalada', category: 'Frutas', price: 2.49, unit: 'kg' },
+            { id: '7', name: 'Coca Cola 33cl', category: 'Bebidas', price: 0.90, unit: 'ud' },
+            { id: '8', name: 'Cerveza 33cl', category: 'Bebidas', price: 0.85, unit: 'ud' }
+        ];
+
+        productos.forEach(p => { if (!p.unit) p.unit = 'ud'; if (p.iva === undefined || p.iva === null || isNaN(Number(p.iva))) p.iva = 21; p.iva = Number(p.iva); });
+        let inventario = JSON.parse(localStorage.getItem('mancheguito_inventario')) || productos.map(p => ({ productId: p.id, quantity: 50 }));
+        let ventas = JSON.parse(localStorage.getItem('mancheguito_ventas')) || [];
+        // Parse dates in ventas back to Date objects
+        ventas.forEach(v => v.fecha = new Date(v.fecha));
+
+        let configuracion = JSON.parse(localStorage.getItem('mancheguito_config')) || {
+            nombreTienda: "Super El Mancheguito",
+            nifTienda: "B12345678",
+            direccionTienda: "Calle Mayor, 1",
+            ultimoNumeroTicket: ventas.length,
+            bleServiceUuid: "",
+            bleCharacteristicUuid: "",
+            serialBaudRate: 9600,
+            serialFormato: "auto",
+            serialParity: "none",
+            serialStopBits: 1,
+            backupDiario: true,
+            backupDescargaCierre: true,
+            backupUltimaFecha: null
+        };
+        if (configuracion.backupDiario === undefined) configuracion.backupDiario = true;
+        if (configuracion.backupDescargaCierre === undefined) configuracion.backupDescargaCierre = true;
+
+        let cesta = [];     
+        let porcentajeDescuentoActual = 0; 
+        let usuarioActual = JSON.parse(localStorage.getItem('mancheguito_usuario')) || null;
+        let cantidadPendiente = '';
+        let ultimaVentaParaImprimir = null;
+        let dispositivoBascula = null;
+        let caracteristicaBascula = null;
+        let pesoActualBasculaKg = 0;
+        let puertoBasculaSerie = null;
+        let lectorBasculaSerie = null;
+        let leyendoBasculaSerie = false;
+        let bufferBasculaSerie = '';
+        let registroCambios = JSON.parse(localStorage.getItem('mancheguito_registro_cambios')) || [];
+        let ultimaCopiaDiaria = localStorage.getItem('mancheguito_backup_ultima') || configuracion.backupUltimaFecha || null;
+        let guardandoStorage = false;
+
+        function obtenerEstadoCompleto() {
+            return {
+                version: 3,
+                exportadoEn: new Date().toISOString(),
+                productos: productos,
+                inventario: inventario,
+                ventas: ventas,
+                configuracion: configuracion,
+                usuarioActual: usuarioActual,
+                registroCambios: registroCambios
+            };
+        }
+
+        function resumirEstado(estado) {
+            return JSON.stringify({ productos: estado.productos, inventario: estado.inventario, ventas: estado.ventas, configuracion: estado.configuracion });
+        }
+
+        function registrarCambio(tipo, detalle) {
+            registroCambios.push({ id: 'C-' + Date.now() + '-' + Math.random().toString(36).slice(2,7), fecha: new Date().toISOString(), usuario: usuarioActual?.username || 'sistema', tipo, detalle });
+            if (registroCambios.length > 2000) registroCambios = registroCambios.slice(-2000);
+            localStorage.setItem('mancheguito_registro_cambios', JSON.stringify(registroCambios));
+        }
+
+        function guardarEnStorage(origen='cambio') {
+            if (guardandoStorage) return;
+            guardandoStorage = true;
+            try {
+                localStorage.setItem('mancheguito_productos', JSON.stringify(productos));
+                localStorage.setItem('mancheguito_inventario', JSON.stringify(inventario));
+                localStorage.setItem('mancheguito_ventas', JSON.stringify(ventas));
+                localStorage.setItem('mancheguito_config', JSON.stringify(configuracion));
+                localStorage.setItem('mancheguito_usuario', JSON.stringify(usuarioActual));
+                localStorage.setItem('mancheguito_registro_cambios', JSON.stringify(registroCambios));
+                if (origen && origen !== 'inicio' && origen !== 'restauracion' && origen !== 'backup') registrarCambio('DATOS', origen);
+            } finally { guardandoStorage = false; }
+        }
+
+        function descargarJSON(nombre, datos) {
+            const blob = new Blob([JSON.stringify(datos, null, 2)], {type:'application/json;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = nombre; a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function crearBackup(descargar=true, motivo='manual') {
+            const estado = obtenerEstadoCompleto();
+            estado.motivo = motivo;
+            estado.resumen = { productos: productos.length, stock: inventario.length, ventas: ventas.length, modificaciones: registroCambios.length };
+            if (descargar) {
+                const fecha = new Date().toISOString().replace(/[:.]/g,'-');
+                descargarJSON(`TPV_El_Mancheguito_backup_${fecha}.json`, estado);
+            }
+            const marca = new Date().toISOString();
+            ultimaCopiaDiaria = marca;
+            localStorage.setItem('mancheguito_backup_ultima', marca);
+            configuracion.backupUltimaFecha = marca;
+            localStorage.setItem('mancheguito_config', JSON.stringify(configuracion));
+            actualizarPanelBackups();
+            return estado;
+        }
+
+        function crearYDescargarBackup(motivo='manual') {
+            crearBackup(true, motivo);
+            mostrarAlerta('Copia de seguridad creada y descargada.');
+        }
+
+        function comprobarBackupDiario() {
+            if (!configuracion.backupDiario) return;
+            const hoy = new Date().toISOString().slice(0,10);
+            if (!ultimaCopiaDiaria || !String(ultimaCopiaDiaria).startsWith(hoy)) {
+                crearBackup(true, 'diario');
+                mostrarAlerta('Copia diaria creada y descargada.');
+            }
+        }
+
+        function actualizarPanelBackups() {
+            const f = document.getElementById('backup-ultima-fecha');
+            const c = document.getElementById('backup-total-cambios');
+            if (f) f.textContent = ultimaCopiaDiaria ? new Date(ultimaCopiaDiaria).toLocaleString('es-ES') : 'Nunca';
+            if (c) c.textContent = registroCambios.length;
+        }
+
+        async function restaurarBackupDesdeArchivo(event) {
+            const archivo = event.target.files?.[0];
+            event.target.value = '';
+            if (!archivo) return;
+            try {
+                const texto = await archivo.text();
+                const datos = JSON.parse(texto);
+                if (!Array.isArray(datos.productos) || !Array.isArray(datos.inventario) || !Array.isArray(datos.ventas) || !datos.configuracion) throw new Error('Formato de copia no válido.');
+                const ok = await mostrarConfirmacionPersonalizada('Restaurar copia', 'Se sustituirán los datos actuales por los de la copia. Se creará una copia de seguridad del estado actual antes de restaurar. ¿Continuar?');
+                if (!ok) return;
+                crearBackup(true, 'antes-restauracion');
+                productos = datos.productos; inventario = datos.inventario; ventas = datos.ventas; configuracion = datos.configuracion;
+                ventas.forEach(v => v.fecha = new Date(v.fecha));
+                usuarioActual = datos.usuarioActual || usuarioActual;
+                registroCambios = Array.isArray(datos.registroCambios) ? datos.registroCambios : [];
+                registrarCambio('RESTAURACION', `Restaurada copia ${archivo.name}`);
+                guardarEnStorage('restauracion');
+                document.getElementById('app-title').textContent = configuracion.nombreTienda;
+                renderizarTableroTrello(); renderizarListaInventario(); renderProductos(); renderFacturas(); renderDashboard(); renderArqueo(); renderConfig();
+                mostrarAlerta('Copia restaurada correctamente.');
+            } catch(e) { mostrarAlerta('No se pudo restaurar la copia: ' + e.message, 'error'); }
+        }
+
+        function guardarEnStorageLegacy() { guardarEnStorage('cambio'); }
+
+        // --- CORE UI FUNCTIONS ---
+        function mostrarFechaActual() {
+            const fecha = new Date();
+            document.getElementById('fecha-actual').textContent = fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        }
+        setInterval(mostrarFechaActual, 60000);
+        mostrarFechaActual();
+
+        function mostrarAlerta(mensaje, tipo = 'success') {
+            const alerta = document.getElementById('alerta-global');
+            alerta.textContent = mensaje;
+            alerta.className = `fixed top-16 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded shadow-lg transition-opacity duration-300 text-white text-sm ${tipo === 'error' ? 'bg-red-600' : (tipo === 'warning' ? 'bg-yellow-600' : 'bg-green-600')}`;
+            alerta.style.opacity = '1';
+            setTimeout(() => alerta.style.opacity = '0', 2500);
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('closed');
+            overlay.classList.toggle('hidden');
+        }
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active', 'bg-blue-50', 'text-blue-600'));
+                item.classList.add('active', 'bg-blue-50', 'text-blue-600');
+                
+                const seccion = item.getAttribute('data-section');
+                document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active'));
+                document.getElementById(seccion).classList.add('active');
+                
+                if(window.innerWidth < 768) toggleSidebar();
+                
+                if(seccion === 'punto-venta') renderizarTableroTrello();
+                if(seccion === 'inventario') renderizarListaInventario();
+                if(seccion === 'dashboard') renderDashboard();
+                if(seccion === 'productos') renderProductos();
+                if(seccion === 'historial-ventas') renderHistorial();
+                if(seccion === 'facturas') renderFacturas();
+                if(seccion === 'arqueo-caja') renderArqueo();
+                if(seccion === 'configuracion') renderConfig();
+            });
+        });
+
+        // Auto-auth check on load
+        window.onload = function() {
+            document.getElementById('app-title').textContent = configuracion.nombreTienda;
+            if (usuarioActual) {
+                document.getElementById('modal-inicio-sesion').classList.remove('show');
+                setTimeout(()=> document.getElementById('modal-inicio-sesion').style.display='none', 200);
+                document.getElementById('display-usuario-actual').textContent = usuarioActual.username;
+                renderizarTableroTrello();
+                actualizarDisplayCantidad();
+                comprobarBackupDiario();
+                actualizarPanelBackups();
+            }
+        };
+
+        function cerrarModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        let resolucionConfirmacion;
+        function mostrarConfirmacionPersonalizada(titulo, mensaje) {
+            const modal = document.getElementById('modal-confirmacion');
+            document.getElementById('titulo-confirmacion').textContent = titulo;
+            document.getElementById('mensaje-confirmacion').textContent = mensaje;
+            modal.classList.add('show');
+            return new Promise((resolve) => resolucionConfirmacion = resolve);
+        }
+        document.getElementById('btn-confirmar-si').addEventListener('click', () => {
+            document.getElementById('modal-confirmacion').classList.remove('show');
+            if (resolucionConfirmacion) resolucionConfirmacion(true);
+        });
+        document.getElementById('btn-confirmar-no').addEventListener('click', () => {
+            document.getElementById('modal-confirmacion').classList.remove('show');
+            if (resolucionConfirmacion) resolucionConfirmacion(false);
+        });
+
+        function gestionarInicioSesion() {
+            const u = document.getElementById('campo-usuario').value.trim();
+            const p = document.getElementById('campo-contrasena').value.trim();
+            if (u === 'admin' && p === 'adminpassword') {
+                usuarioActual = { username: 'admin', role: 'admin' };
+                guardarEnStorage();
+                document.getElementById('modal-inicio-sesion').classList.remove('show');
+                setTimeout(()=> document.getElementById('modal-inicio-sesion').style.display='none', 200);
+                document.getElementById('display-usuario-actual').textContent = usuarioActual.username;
+                mostrarAlerta('Sesión iniciada correctamente.');
+                renderizarTableroTrello();
+            } else {
+                document.getElementById('error-inicio-sesion').textContent = 'Pruebe admin / adminpassword';
+            }
+        }
+
+        function cerrarSesion() {
+            usuarioActual = null;
+            guardarEnStorage();
+            const modal = document.getElementById('modal-inicio-sesion');
+            modal.style.display = 'flex';
+            setTimeout(()=> modal.classList.add('show'), 10);
+            toggleSidebar();
+        }
+
+        // --- TRELLO UI & BARCODE SCANNER / SEARCH ---
+        function formatearMoneda(cantidad) {
+            return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(cantidad);
+        }
+
+        function renderizarTableroTrello() {
+            const tablero = document.getElementById('trello-board');
+            tablero.innerHTML = '';
+
+            const categorias = {};
+            productos.forEach(p => {
+                if(!categorias[p.category]) categorias[p.category] = [];
+                categorias[p.category].push(p);
+            });
+
+            for (const [catName, prods] of Object.entries(categorias)) {
+                const listDiv = document.createElement('div');
+                listDiv.className = 'trello-list max-h-full flex flex-col shrink-0';
+                
+                const header = document.createElement('div');
+                header.className = 'px-3 py-2 font-semibold text-xs md:text-sm flex justify-between items-center text-gray-700 bg-gray-200/50';
+                header.innerHTML = `<span>${catName}</span> <span class="bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full">${prods.length}</span>`;
+                
+                const cardsContainer = document.createElement('div');
+                cardsContainer.className = 'flex-1 overflow-y-auto p-2 space-y-2';
+                
+                prods.forEach(p => {
+                    const card = document.createElement('div');
+                    card.className = 'trello-card p-2 select-none group';
+                    card.onclick = () => anadirACesta(p.id);
+                    card.innerHTML = `
+                        <div class="text-xs md:text-sm font-medium text-gray-800">${p.name}</div>
+                        <div class="flex justify-between items-center mt-1">
+                            <span class="text-[10px] text-gray-500">ID: ${p.id}</span>
+                            <span class="text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">${formatearMoneda(p.price)} · IVA ${Number(p.iva ?? 21).toFixed(2).replace(/\.00$/, '')}% / ${p.unit === 'kg' ? 'kg' : 'ud'}</span>
+                        </div>
+                    `;
+                    cardsContainer.appendChild(card);
+                });
+
+                listDiv.appendChild(header);
+                listDiv.appendChild(cardsContainer);
+                tablero.appendChild(listDiv);
+            }
+        }
+
+        function gestionarEscaneoCodigoBarras(event) {
+            if (event.key === 'Enter') {
+                const val = event.target.value.trim().toLowerCase();
+                if(!val) return;
+                
+                // Search by exact ID or partial name
+                const prod = productos.find(p => p.id === val || p.name.toLowerCase().includes(val));
+                if (prod) {
+                    anadirACesta(prod.id);
+                    event.target.value = '';
+                } else {
+                    mostrarAlerta('Producto no encontrado', 'warning');
+                }
+            }
+        }
+
+        function simularBuscar() {
+            const input = document.getElementById('campo-codigo-barras');
+            input.focus();
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // --- CART LOGIC ---
+        async function anadirACesta(idProducto) {
+            const producto = productos.find(p => p.id === idProducto);
+            if (!producto) return;
+            let cantidad = parseFloat(cantidadPendiente);
+            if (!isFinite(cantidad) || cantidad <= 0) cantidad = 1;
+
+            if (producto.unit === 'kg' && cantidadPendiente === '') {
+                if (pesoActualBasculaKg > 0.001) {
+                    cantidad = pesoActualBasculaKg;
+                } else {
+                    const pesoManual = prompt(`Peso de ${producto.name} en kg:`, '1.000');
+                    if (pesoManual === null) return;
+                    cantidad = parseFloat(String(pesoManual).replace(',', '.'));
+                    if (!isFinite(cantidad) || cantidad <= 0) return mostrarAlerta('Peso no válido', 'warning');
+                }
+            }
+
+            const item = cesta.find(i => i.productId === idProducto);
+            if (item) item.quantity = Number((item.quantity + cantidad).toFixed(3));
+            else cesta.push({ ...producto, productId: producto.id, quantity: Number(cantidad.toFixed(3)) });
+
+            cantidadPendiente = '';
+            actualizarDisplayCantidad();
+            renderizarCesta();
+        }
+
+        function renderizarCesta() {
+            const contenedor = document.getElementById('articulos-cesta');
+            if (cesta.length === 0) {
+                contenedor.innerHTML = '<div class="text-center text-gray-400 text-sm mt-10 italic">La cesta está vacía</div>';
+                document.getElementById('subtotal').textContent = '0.00 €';
+                document.getElementById('cantidad-total').textContent = '0.00 €';
+                document.getElementById('cantidad-iva').textContent = '0.00 €';
+                return;
+            }
+
+            contenedor.innerHTML = cesta.map(item => `
+                <div class="bg-white p-2 rounded shadow-sm border border-gray-200 text-xs md:text-sm flex justify-between items-center group relative overflow-hidden">
+                    <div class="flex-1 truncate pr-2">
+                        <div class="font-medium text-gray-800 truncate">${item.name}</div>
+                        <div class="text-[10px] text-gray-500">${Number(item.quantity).toFixed(item.unit === 'kg' ? 3 : 0)} ${item.unit === 'kg' ? 'kg' : 'ud'} x ${formatearMoneda(item.price)}${item.unit === 'kg' ? '/kg' : ''} · IVA ${Number(item.iva ?? 21).toFixed(2).replace(/\.00$/, '')}%</div>
+                    </div>
+                    <div class="font-semibold text-gray-800 shrink-0">
+                        ${formatearMoneda(item.price * item.quantity * (1 + Number(item.iva ?? 21) / 100))}
+                    </div>
+                    <button class="absolute right-0 top-0 bottom-0 w-8 bg-red-50 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white" onclick="eliminarDeCesta('${item.productId}')">
+                        <i class="fas fa-trash text-xs"></i>
+                    </button>
+                </div>
+            `).join('');
+
+            calcularTotales();
+        }
+
+        function eliminarDeCesta(id) {
+            cesta = cesta.filter(i => i.productId !== id);
+            renderizarCesta();
+        }
+
+        async function confirmarVaciarCesta() {
+            if (cesta.length === 0) return;
+            if (await mostrarConfirmacionPersonalizada('Vaciar Ticket', '¿Descartar el ticket actual?')) {
+                cesta = [];
+                porcentajeDescuentoActual = 0;
+                document.getElementById('display-porcentaje-descuento').textContent = '0';
+                document.getElementById('cantidad-descuento').textContent = '-0.00 €';
+                renderizarCesta();
+            }
+        }
+
+        function calcularTotales() {
+            let totalBruto = 0;
+            cesta.forEach(i => totalBruto += (Number(i.price) * Number(i.quantity)));
+            const descuento = totalBruto * (porcentajeDescuentoActual / 100);
+            const total = totalBruto - descuento;
+            const factorDescuento = totalBruto > 0 ? total / totalBruto : 1;
+            let baseConDescuento = 0;
+            let iva = 0;
+            cesta.forEach(i => {
+                const totalItem = Number(i.price) * Number(i.quantity) * factorDescuento;
+                const tipoIva = Number(i.iva ?? 21);
+                const baseItem = tipoIva > 0 ? totalItem / (1 + tipoIva / 100) : totalItem;
+                baseConDescuento += baseItem;
+                iva += totalItem - baseItem;
+            });
+
+            document.getElementById('subtotal').textContent = formatearMoneda(baseConDescuento);
+            document.getElementById('cantidad-descuento').textContent = `-${formatearMoneda(descuento)}`;
+            document.getElementById('cantidad-iva').textContent = formatearMoneda(iva);
+            document.getElementById('cantidad-total').textContent = formatearMoneda(total);
+            return { totalBruto, descuento, baseConDescuento, iva, total };
+        }
+
+        function aplicarDescuento(pct) {
+            porcentajeDescuentoActual = porcentajeDescuentoActual === pct ? 0 : pct;
+            document.getElementById('display-porcentaje-descuento').textContent = porcentajeDescuentoActual;
+            calcularTotales();
+        }
+
+        function actualizarDisplayCantidad() {
+            const el = document.getElementById('cantidad-pendiente-display');
+            if (el) el.textContent = cantidadPendiente === '' ? '1' : cantidadPendiente;
+        }
+
+        function handleKeypadInput(key) {
+            if (key === 'C') {
+                cantidadPendiente = '';
+                actualizarDisplayCantidad();
+                return;
+            }
+            if (key === '.') {
+                if (!cantidadPendiente.includes('.')) cantidadPendiente = cantidadPendiente === '' ? '0.' : cantidadPendiente + '.';
+            } else {
+                if (cantidadPendiente === '0') cantidadPendiente = key;
+                else cantidadPendiente += key;
+            }
+            actualizarDisplayCantidad();
+        }
+
+        async function procesarVenta(metodo) {
+            if(cesta.length === 0) return mostrarAlerta('Cesta vacía', 'warning');
+            if (await mostrarConfirmacionPersonalizada('Cobrar Ticket', `¿Finalizar venta en ${metodo === 'cash' ? 'Efectivo' : 'Tarjeta'}?`)) {
+                
+                const totales = calcularTotales();
+                const total = totales.total;
+                
+                configuracion.ultimoNumeroTicket++;
+                const idVenta = `T-${1000 + configuracion.ultimoNumeroTicket}`;
+                
+                const nuevaVenta = {
+                    id: idVenta,
+                    fecha: new Date(),
+                    metodo: metodo,
+                    articulos: [...cesta],
+                    baseImponible: totales.baseConDescuento,
+                    descuento: totales.descuento,
+                    ivaTotal: totales.iva,
+                    total: total
+                };
+                ventas.push(nuevaVenta);
+                ultimaVentaParaImprimir = nuevaVenta;
+                
+                // Update stock in persistence
+                cesta.forEach(item => {
+                    let inv = inventario.find(i => i.productId === item.productId);
+                    if(inv) {
+                        inv.quantity -= item.quantity;
+                    } else {
+                        inventario.push({ productId: item.productId, quantity: 50 - item.quantity });
+                    }
+                });
+
+                guardarEnStorage('VENTA');
+                mostrarAlerta('¡Venta guardada con éxito!');
+                cesta = [];
+                porcentajeDescuentoActual = 0;
+                document.getElementById('display-porcentaje-descuento').textContent = '0';
+                renderizarCesta();
+                document.getElementById('modal-ticket').classList.add('show');
+            }
+        }
+
+        // --- INVENTORY, PRODUCTS & PDF MODULES ---
+        function renderizarListaInventario() {
+            const tbody = document.getElementById('cuerpo-tabla-inventario');
+            const filtro = document.getElementById('buscar-en-inventario')?.value.toLowerCase() || '';
+            
+            tbody.innerHTML = inventario.map(inv => {
+                const p = productos.find(x => x.id === inv.productId);
+                if(!p || !p.name.toLowerCase().includes(filtro)) return '';
+                return `
+                    <tr class="hover:bg-gray-50 text-xs md:text-sm">
+                        <td class="text-gray-500">${p.id}</td>
+                        <td class="font-medium text-gray-800">${p.name}</td>
+                        <td><span class="px-2 py-1 bg-green-100 text-green-800 rounded font-bold">${inv.quantity}</span></td>
+                        <td><button class="text-blue-600 hover:text-blue-800 p-1" onclick="editarStockRapido('${p.id}')"><i class="fas fa-edit"></i></button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function editarStockRapido(id) {
+            const nuevoStock = prompt('Nuevo stock para el producto:');
+            if(nuevoStock !== null && !isNaN(nuevoStock)) {
+                let inv = inventario.find(i => i.productId === id);
+                if(inv) inv.quantity = parseInt(nuevoStock);
+                else inventario.push({ productId: id, quantity: parseInt(nuevoStock) });
+                guardarEnStorage('STOCK');
+                renderizarListaInventario();
+                mostrarAlerta('Stock actualizado');
+            }
+        }
+
+        function imprimirTicketUltimaVenta() {
+            cerrarModal('modal-ticket');
+            if (!ultimaVentaParaImprimir) return mostrarAlerta('No hay venta para imprimir', 'warning');
+            imprimirTicket(ultimaVentaParaImprimir);
+        }
+
+        function imprimirTicket(venta = null) {
+            const v = venta || { id:'PREVISUALIZACION', fecha:new Date(), articulos:cesta, total:0 };
+            if (!v.articulos || !v.articulos.length) return mostrarAlerta('No hay ticket para imprimir', 'warning');
+            const lineas = v.articulos.map(item => {
+                const totalItem = Number(item.price) * Number(item.quantity);
+                const tipoIvaItem = Number(item.iva ?? 21);
+                const baseItem = tipoIvaItem > 0 ? totalItem / (1 + tipoIvaItem / 100) : totalItem;
+                const ivaItem = totalItem - baseItem;
+                return `<tr><td>${Number(item.quantity).toFixed(item.unit === 'kg' ? 3 : 0)} ${item.unit === 'kg' ? 'kg' : 'ud'} x ${formatearMoneda(item.price)}${item.unit === 'kg' ? '/kg' : ''} · IVA ${Number(item.iva ?? 21).toFixed(2).replace(/\.00$/, '')}%<br><span>${item.name}</span></td>
+                <td style="text-align:right">${formatearMoneda(totalItem)}</td></tr>`;
+            }).join('');
+            const baseTicket = v.baseImponible ?? v.articulos.reduce((sum, item) => { const totalItem = Number(item.price) * Number(item.quantity); const tipo = Number(item.iva ?? 21); return sum + (tipo > 0 ? totalItem / (1 + tipo / 100) : totalItem); }, 0);
+            const ivaTicket = v.ivaTotal ?? Math.max(0, Number(v.total) - Number(baseTicket));
+            const ticketHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Ticket ${v.id}</title>
+                <style>@page{size:80mm auto;margin:3mm}body{font-family:Arial,sans-serif;width:72mm;margin:auto;font-size:11px;color:#000}h1{font-size:16px;text-align:center;margin:0 0 4px}p{text-align:center;margin:2px 0}table{width:100%;border-collapse:collapse;margin-top:8px}td{padding:3px 0;vertical-align:top}.total{border-top:1px dashed #000;margin-top:6px;padding-top:6px;font-size:14px;font-weight:bold;display:flex;justify-content:space-between}.small{font-size:9px}</style></head>
+                <body><h1>${configuracion.nombreTienda}</h1><p>NIF: ${configuracion.nifTienda}</p><p>${configuracion.direccionTienda}</p>
+                <p class="small">${new Date(v.fecha).toLocaleString('es-ES')} · ${v.id}</p><table>${lineas}</table>
+                <div style="border-top:1px dashed #000;margin-top:6px;padding-top:5px;font-size:10px"><div style="display:flex;justify-content:space-between"><span>Base imponible</span><span>${formatearMoneda(baseTicket)}</span></div><div style="display:flex;justify-content:space-between"><span>IVA</span><span>${formatearMoneda(ivaTicket)}</span></div></div><div class="total"><span>TOTAL</span><span>${formatearMoneda(v.total)}</span></div><p class="small">Gracias por su compra</p></body></html>`;
+            const w = window.open('', '_blank', 'width=420,height=700');
+            if (w) {
+                w.document.write(ticketHtml);
+                w.document.close();
+                setTimeout(() => { try { w.focus(); w.print(); } catch(e) {} }, 300);
+                return;
+            }
+            // iOS/PWA fallback: print an invisible iframe when popups are unavailable.
+            let frame = document.getElementById('tpv-print-frame');
+            if (!frame) { frame = document.createElement('iframe'); frame.id = 'tpv-print-frame'; frame.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;'; document.body.appendChild(frame); }
+            const doc = frame.contentDocument || frame.contentWindow.document;
+            doc.open(); doc.write(ticketHtml); doc.close();
+            setTimeout(() => { try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch(e) { mostrarAlerta('Abre el menú Compartir > Imprimir del iPhone/iPad.', 'warning'); } }, 300);
+        }
+
+        function renderDashboard() {
+            const hoy = new Date().toDateString();
+            const ventasHoy = ventas.filter(v => new Date(v.fecha).toDateString() === hoy);
+            
+            const totalEuros = ventasHoy.reduce((sum, v) => sum + v.total, 0);
+            document.getElementById('dash-ventas-hoy').textContent = formatearMoneda(totalEuros);
+            document.getElementById('dash-tickets').textContent = ventasHoy.length;
+            
+            const alertasStock = inventario.filter(i => i.quantity < 10).length;
+            document.getElementById('dash-stock').textContent = alertasStock;
+        }
+
+        function renderProductos() {
+            const tbody = document.getElementById('tabla-productos');
+            tbody.innerHTML = productos.map(p => `
+                <tr class="hover:bg-gray-50 text-xs md:text-sm">
+                    <td class="text-gray-500">${p.id}</td>
+                    <td class="font-medium text-gray-800">${p.name}</td>
+                    <td><span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">${p.category}</span></td>
+                    <td class="font-bold">${formatearMoneda(p.price)}</td>
+                    <td><span class="bg-green-50 text-green-700 px-2 py-0.5 rounded text-xs font-semibold">${Number(p.iva ?? 21).toFixed(2).replace(/\.00$/, '')}%</span></td>
+                    <td>
+                        <button class="text-blue-600 hover:text-blue-800 mx-1 p-1" onclick="abrirModalProducto('${p.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="text-red-600 hover:text-red-800 mx-1 p-1" onclick="eliminarProducto('${p.id}')"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function abrirModalProducto(id = null) {
+            const modal = document.getElementById('modal-producto');
+            if (id) {
+                const prod = productos.find(p => p.id === id);
+                document.getElementById('titulo-modal-producto').textContent = 'Editar Producto';
+                document.getElementById('prod-id').value = prod.id;
+                document.getElementById('prod-nombre').value = prod.name;
+                document.getElementById('prod-categoria').value = prod.category;
+                document.getElementById('prod-precio').value = prod.price;
+                document.getElementById('prod-iva').value = prod.iva ?? 21;
+                document.getElementById('prod-unidad').value = prod.unit || 'ud';
+            } else {
+                document.getElementById('titulo-modal-producto').textContent = 'Nuevo Producto';
+                document.getElementById('prod-id').value = '';
+                document.getElementById('prod-nombre').value = '';
+                document.getElementById('prod-categoria').value = '';
+                document.getElementById('prod-precio').value = '';
+                document.getElementById('prod-iva').value = 21;
+                document.getElementById('prod-unidad').value = 'ud';
+            }
+            modal.classList.add('show');
+        }
+
+        function guardarProducto() {
+            const id = document.getElementById('prod-id').value || Date.now().toString().slice(-4);
+            const nombre = document.getElementById('prod-nombre').value.trim();
+            const cat = document.getElementById('prod-categoria').value.trim();
+            const precio = parseFloat(document.getElementById('prod-precio').value) || 0;
+            const iva = parseFloat(document.getElementById('prod-iva').value);
+            const unidad = document.getElementById('prod-unidad').value || 'ud';
+
+            if(!nombre || !cat) return mostrarAlerta('Faltan campos obligatorios', 'warning');
+            if(precio <= 0) return mostrarAlerta('El precio debe ser mayor que 0', 'warning');
+            if(!isFinite(iva) || iva < 0 || iva > 100) return mostrarAlerta('El IVA debe estar entre 0 y 100%', 'warning');
+
+            const index = productos.findIndex(p => p.id === id);
+            const nuevoProducto = { id, name: nombre, category: cat, price: precio, iva: iva, unit: unidad };
+
+            if(index > -1) {
+                productos[index] = nuevoProducto;
+                mostrarAlerta('Producto actualizado');
+            } else {
+                productos.push(nuevoProducto);
+                inventario.push({ productId: id, quantity: 50 });
+                mostrarAlerta('Producto creado');
+            }
+            guardarEnStorage();
+            cerrarModal('modal-producto');
+            renderProductos();
+        }
+
+        async function eliminarProducto(id) {
+            if (await mostrarConfirmacionPersonalizada('Borrar Producto', '¿Eliminar este producto?')) {
+                productos = productos.filter(p => p.id !== id);
+                inventario = inventario.filter(i => i.productId !== id);
+                guardarEnStorage();
+                renderProductos();
+                mostrarAlerta('Producto eliminado', 'info');
+            }
+        }
+
+        function renderHistorial() {
+            const tbody = document.getElementById('tabla-historial');
+            const ventasRev = [...ventas].reverse();
+            tbody.innerHTML = ventasRev.map(v => `
+                <tr class="hover:bg-gray-50 text-xs md:text-sm">
+                    <td class="font-bold text-blue-600">${v.id}</td>
+                    <td class="text-gray-600">${new Date(v.fecha).toLocaleString('es-ES')}</td>
+                    <td><span class="px-2 py-0.5 rounded text-[10px] font-bold ${v.metodo === 'cash' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}">${v.metodo.toUpperCase()}</span></td>
+                    <td class="font-bold text-gray-800">${formatearMoneda(v.total)}</td>
+                </tr>
+            `).join('');
+        }
+
+        let ticketSeleccionadoParaFactura = null;
+        function renderFacturas() {
+            const tbody = document.getElementById('tabla-facturas');
+            const ventasRev = [...ventas].reverse();
+            tbody.innerHTML = ventasRev.map(v => `
+                <tr class="hover:bg-gray-50 text-xs md:text-sm">
+                    <td class="font-medium text-gray-800">${v.id}</td>
+                    <td class="text-gray-600">${new Date(v.fecha).toLocaleDateString('es-ES')}</td>
+                    <td class="font-bold">${formatearMoneda(v.total)}</td>
+                    <td><button class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-2.5 py-1 rounded text-xs font-bold border border-blue-200" onclick="prepararFactura('${v.id}')">Facturar</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function prepararFactura(idVenta) {
+            ticketSeleccionadoParaFactura = ventas.find(v => v.id === idVenta);
+            document.getElementById('factura-ticket-id').textContent = idVenta;
+            document.getElementById('fact-cliente').value = '';
+            document.getElementById('fact-nif').value = '';
+            document.getElementById('fact-direccion').value = '';
+            document.getElementById('fact-telefono').value = '';
+            document.getElementById('fact-email').value = '';
+            document.getElementById('modal-factura').classList.add('show');
+        }
+
+        function generarPDFfactura() {
+            const cliente = document.getElementById('fact-cliente').value.trim();
+            const nif = document.getElementById('fact-nif').value.trim();
+            const dir = document.getElementById('fact-direccion').value.trim();
+            const telefono = document.getElementById('fact-telefono').value.trim();
+            const email = document.getElementById('fact-email').value.trim();
+            
+            if(!cliente || !nif || !dir) return mostrarAlerta('Nombre/Empresa, NIF/CIF y Dirección son obligatorios', 'warning');
+            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return mostrarAlerta('El correo electrónico no es válido', 'warning');
+
+            mostrarAlerta('Generando Factura PDF...', 'info');
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+            doc.text("FACTURA", 20, 20);
+            
+            doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+            doc.text(`Emisor: ${configuracion.nombreTienda}`, 20, 30);
+            doc.text(`NIF: ${configuracion.nifTienda}`, 20, 35);
+            doc.text(`Dirección: ${configuracion.direccionTienda}`, 20, 40);
+
+            doc.text(`Cliente: ${cliente}`, 120, 30);
+            doc.text(`NIF: ${nif}`, 120, 35);
+            doc.text(`Dirección: ${dir}`, 120, 40);
+            let datosContactoY = 45;
+            if (telefono) { doc.text(`Teléfono: ${telefono}`, 120, datosContactoY); datosContactoY += 5; }
+            if (email) { doc.text(`Correo: ${email}`, 120, datosContactoY); datosContactoY += 5; }
+
+            doc.text(`Nº Factura: F-${ticketSeleccionadoParaFactura.id.split('-')[1]}`, 20, 55);
+            doc.text(`Fecha: ${new Date(ticketSeleccionadoParaFactura.fecha).toLocaleDateString('es-ES')}`, 20, 60);
+
+            let y = 75;
+            doc.setFont('helvetica', 'bold');
+            doc.text("Descripción", 20, y); doc.text("Cant.", 105, y); doc.text("Precio", 125, y); doc.text("IVA", 150, y); doc.text("Total", 175, y);
+            y += 5; doc.line(20, y, 190, y); y += 8;
+            
+            doc.setFont('helvetica', 'normal');
+            ticketSeleccionadoParaFactura.articulos.forEach(item => {
+                doc.text(item.name, 20, y);
+                const totalItem = Number(item.price) * Number(item.quantity);
+                const tipoIvaItem = Number(item.iva ?? 21);
+                const baseItem = tipoIvaItem > 0 ? totalItem / (1 + tipoIvaItem / 100) : totalItem;
+                const ivaItem = totalItem - baseItem;
+                doc.text(`${Number(item.quantity).toFixed(item.unit === 'kg' ? 3 : 0)} ${item.unit === 'kg' ? 'kg' : 'ud'}`, 105, y);
+                doc.text(formatearMoneda(item.price), 125, y);
+                doc.text(`${Number(item.iva ?? 21).toFixed(2).replace(/\.00$/, '')}%`, 150, y);
+                doc.text(formatearMoneda(totalItem), 175, y);
+                y += 8;
+            });
+
+            doc.line(20, y, 190, y); y += 7;
+            const baseFactura = ticketSeleccionadoParaFactura.baseImponible ?? ticketSeleccionadoParaFactura.articulos.reduce((sum, item) => { const totalItem = Number(item.price) * Number(item.quantity); const tipo = Number(item.iva ?? 21); return sum + (tipo > 0 ? totalItem / (1 + tipo / 100) : totalItem); }, 0);
+            const ivaFactura = ticketSeleccionadoParaFactura.ivaTotal ?? Math.max(0, Number(ticketSeleccionadoParaFactura.total) - Number(baseFactura));
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+            doc.text(`Base imponible: ${formatearMoneda(baseFactura)}`, 125, y); y += 5;
+            doc.text(`IVA: ${formatearMoneda(ivaFactura)}`, 125, y); y += 7;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+            doc.text(`TOTAL: ${formatearMoneda(ticketSeleccionadoParaFactura.total)}`, 125, y);
+            
+            doc.save(`Factura_${ticketSeleccionadoParaFactura.id}.pdf`);
+            cerrarModal('modal-factura');
+        }
+
+        let totalCajaTeorico = 0;
+        function renderArqueo() {
+            const hoy = new Date().toDateString();
+            const ventasHoy = ventas.filter(v => new Date(v.fecha).toDateString() === hoy);
+            
+            const totalEfectivo = ventasHoy.filter(v => v.metodo === 'cash').reduce((sum, v) => sum + v.total, 0);
+            const totalTarjeta = ventasHoy.filter(v => v.metodo === 'card').reduce((sum, v) => sum + v.total, 0);
+            totalCajaTeorico = totalEfectivo;
+            
+            document.getElementById('arq-efectivo').textContent = formatearMoneda(totalEfectivo);
+            document.getElementById('arq-tarjeta').textContent = formatearMoneda(totalTarjeta);
+            document.getElementById('arq-total').textContent = formatearMoneda(totalEfectivo);
+            document.getElementById('arq-real').value = '';
+            calcularDescuadre();
+        }
+
+        function calcularDescuadre() {
+            const real = parseFloat(document.getElementById('arq-real').value) || 0;
+            const diff = real - totalCajaTeorico;
+            const res = document.getElementById('arq-resultado');
+            res.textContent = `Descuadre: ${formatearMoneda(diff)}`;
+            res.className = `p-3 rounded mb-4 text-center font-bold text-sm ${diff === 0 ? 'bg-green-100 text-green-800' : (diff < 0 ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800')}`;
+        }
+
+        async function cerrarCaja() {
+            if (await mostrarConfirmacionPersonalizada('Cerrar Caja', 'Se creará una copia completa antes del cierre. ¿Cerrar la caja por hoy?')) {
+                registrarCambio('CIERRE_CAJA', 'Cierre de caja confirmado');
+                crearBackup(configuracion.backupDescargaCierre !== false, 'cierre-caja');
+                mostrarAlerta(configuracion.backupDescargaCierre !== false ? 'Copia de seguridad creada y descargada. Caja cerrada con éxito.' : 'Copia de seguridad preparada. Caja cerrada con éxito.');
+            }
+        }
+
+        function actualizarPesoDesdeTextoCAS(texto) {
+            try {
+                const limpio = String(texto || '').replace(/\\0/g, ' ').trim();
+                if (!limpio) return false;
+                const tokens = limpio.match(/[+-]?\\d+(?:[.,]\\d+)?/g) || [];
+                if (!tokens.length) return false;
+                // En los formatos CAS de 10/22 bytes el dato de peso es el bloque numérico principal;
+                // tomando el último número evitamos confundirlo con el ID del dispositivo.
+                let peso = parseFloat(tokens[tokens.length - 1].replace(',', '.'));
+                if (!Number.isFinite(peso)) return false;
+                if (/\\b(?:g|gram|grams)\\b/i.test(limpio)) peso /= 1000;
+                if (/\\b(?:t|ton|tons)\\b/i.test(limpio)) peso *= 1000;
+                if (peso < 0 || peso >= 300) return false;
+                pesoActualBasculaKg = Number(peso.toFixed(3));
+                const pesoEl = document.getElementById('peso-bascula');
+                if (pesoEl) pesoEl.textContent = pesoActualBasculaKg.toFixed(3).replace('.', ',') + ' kg';
+                return true;
+            } catch(e) {
+                console.warn('No se pudo interpretar la trama CAS', e);
+                return false;
+            }
+        }
+
+        function actualizarEstadoSerie(texto, ok=false) {
+            const el = document.getElementById('estado-bascula-serie');
+            if (!el) return;
+            el.textContent = texto;
+            el.className = 'px-2 py-2 rounded text-xs ' + (ok ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600');
+        }
+
+        async function conectarBasculaSerie() {
+            if (!('serial' in navigator)) {
+                return mostrarAlerta('Este navegador no admite Web Serial. Usa Chrome o Edge en HTTPS o desde localhost.', 'warning');
+            }
+            if (puertoBasculaSerie) {
+                mostrarAlerta('La báscula por cable ya está conectada.', 'warning');
+                return;
+            }
+            try {
+                const baudRate = Number(configuracion.serialBaudRate || 9600);
+                const parity = configuracion.serialParity || 'none';
+                const stopBits = Number(configuracion.serialStopBits || 1);
+                actualizarEstadoSerie('Selecciona el puerto…');
+                puertoBasculaSerie = await navigator.serial.requestPort();
+                await puertoBasculaSerie.open({ baudRate, dataBits: 8, stopBits, parity, flowControl: 'none' });
+                leyendoBasculaSerie = true;
+                bufferBasculaSerie = '';
+                actualizarEstadoSerie('Conectada · esperando peso', true);
+                mostrarAlerta('Báscula CAS conectada por USB/RS-232');
+                leerBasculaSerie();
+            } catch(e) {
+                console.error(e);
+                if (puertoBasculaSerie) {
+                    try { await puertoBasculaSerie.close(); } catch(_) {}
+                }
+                puertoBasculaSerie = null;
+                lectorBasculaSerie = null;
+                leyendoBasculaSerie = false;
+                actualizarEstadoSerie('Cable desconectado');
+                mostrarAlerta('No se pudo conectar la báscula CAS: ' + (e.message || 'error de puerto serie'), 'error');
+            }
+        }
+
+        async function leerBasculaSerie() {
+            if (!puertoBasculaSerie || !puertoBasculaSerie.readable) return;
+            const decoder = new TextDecoder();
+            lectorBasculaSerie = puertoBasculaSerie.readable.getReader();
+            try {
+                while (leyendoBasculaSerie) {
+                    const { value, done } = await lectorBasculaSerie.read();
+                    if (done) break;
+                    if (!value) continue;
+                    bufferBasculaSerie += decoder.decode(value, {stream:true});
+                    const lineas = bufferBasculaSerie.split(/\\r?\\n/);
+                    bufferBasculaSerie = lineas.pop() || '';
+                    lineas.forEach(linea => {
+                        if (actualizarPesoDesdeTextoCAS(linea)) {
+                            actualizarEstadoSerie('Conectada · ' + pesoActualBasculaKg.toFixed(3) + ' kg', true);
+                        }
+                    });
+                    // Algunas configuraciones entregan una trama sin CR/LF; intenta
+                    // procesar bloques CAS de 10/22 caracteres cuando el buffer crece.
+                    const formato = configuracion.serialFormato || 'auto';
+                    const longitud = formato === '10' ? 10 : (formato === '22' ? 22 : 0);
+                    if (longitud && bufferBasculaSerie.length >= longitud) {
+                        const bloque = bufferBasculaSerie.slice(0, longitud);
+                        if (actualizarPesoDesdeTextoCAS(bloque)) {
+                            actualizarEstadoSerie('Conectada · ' + pesoActualBasculaKg.toFixed(3) + ' kg', true);
+                            bufferBasculaSerie = bufferBasculaSerie.slice(longitud);
+                        }
+                    } else if (formato === 'auto' && bufferBasculaSerie.length >= 10) {
+                        const posible = bufferBasculaSerie.match(/(?:US|ST|OL)?[^\\r\\n]{0,20}?[+-]?\\d{1,8}(?:[.,]\\d+)?/);
+                        if (posible && actualizarPesoDesdeTextoCAS(posible[0])) {
+                            actualizarEstadoSerie('Conectada · ' + pesoActualBasculaKg.toFixed(3) + ' kg', true);
+                            bufferBasculaSerie = bufferBasculaSerie.slice(posible.index + posible[0].length);
+                        }
+                    }
+                }
+            } catch(e) {
+                if (leyendoBasculaSerie) {
+                    console.error(e);
+                    actualizarEstadoSerie('Error de lectura');
+                }
+            } finally {
+                try { lectorBasculaSerie.releaseLock(); } catch(_) {}
+                lectorBasculaSerie = null;
+            }
+        }
+
+        async function desconectarBasculaSerie() {
+            leyendoBasculaSerie = false;
+            try { if (lectorBasculaSerie) await lectorBasculaSerie.cancel(); } catch(_) {}
+            try { if (puertoBasculaSerie) await puertoBasculaSerie.close(); } catch(_) {}
+            puertoBasculaSerie = null;
+            lectorBasculaSerie = null;
+            bufferBasculaSerie = '';
+            actualizarEstadoSerie('Cable desconectado');
+        }
+
+        function actualizarPesoDesdeBluetooth(event) {
+            try {
+                const value = event.target.value;
+                const texto = new TextDecoder('utf-8').decode(value.buffer).trim().replace(',', '.');
+                const m = texto.match(/(-?\d+(?:\.\d+)?)\s*(kg|g)?/i);
+                let peso = m ? parseFloat(m[1]) : 0;
+                if (m && (m[2] || '').toLowerCase() === 'g') peso /= 1000;
+                if (!peso && value.byteLength >= 2) {
+                    const dv = new DataView(value.buffer, value.byteOffset, value.byteLength);
+                    for (let i=0;i+1<value.byteLength;i+=2) {
+                        const n=dv.getUint16(i,true)/1000;
+                        if(n>0 && n<300){peso=n;break;}
+                    }
+                }
+                if (peso > 0 && peso < 300) {
+                    pesoActualBasculaKg=Number(peso.toFixed(3));
+                    document.getElementById('peso-bascula').textContent=pesoActualBasculaKg.toFixed(3).replace('.',',')+' kg';
+                    document.getElementById('estado-bascula').textContent='Conectada · '+pesoActualBasculaKg.toFixed(3)+' kg';
+                    document.getElementById('estado-bascula').className='px-2 py-2 rounded bg-green-100 text-green-700 text-xs';
+                }
+            } catch(e) { console.warn('No se pudo interpretar el peso BLE',e); }
+        }
+
+        async function conectarBasculaBluetooth() {
+            if (!navigator.bluetooth) return mostrarAlerta('Este navegador no admite Web Bluetooth. Usa Chrome/Edge compatible.', 'warning');
+            try {
+                const serviceUuid=(configuracion.bleServiceUuid||'').trim();
+                const characteristicUuid=(configuracion.bleCharacteristicUuid||'').trim();
+                const options=serviceUuid ? {filters:[{services:[serviceUuid]}],optionalServices:[serviceUuid]} : {acceptAllDevices:true,optionalServices:['device_information']};
+                dispositivoBascula=await navigator.bluetooth.requestDevice(options);
+                dispositivoBascula.addEventListener('gattserverdisconnected',()=>desconectarBasculaBluetooth());
+                const server=await dispositivoBascula.gatt.connect();
+                let service;
+                if(serviceUuid) service=await server.getPrimaryService(serviceUuid);
+                else {
+                    const servicios=await server.getPrimaryServices();
+                    service=servicios.find(x=>x.uuid!=='00001800-0000-1000-8000-00805f9b34fb'&&x.uuid!=='00001801-0000-1000-8000-00805f9b34fb');
+                }
+                if(!service) throw new Error('No se encontró el servicio GATT.');
+                if(characteristicUuid) caracteristicaBascula=await service.getCharacteristic(characteristicUuid);
+                else {
+                    const chars=await service.getCharacteristics();
+                    caracteristicaBascula=chars.find(c=>c.properties.notify||c.properties.read);
+                }
+                if(!caracteristicaBascula) throw new Error('No se encontró la característica de peso.');
+                if(caracteristicaBascula.properties.notify) {
+                    await caracteristicaBascula.startNotifications();
+                    caracteristicaBascula.addEventListener('characteristicvaluechanged',actualizarPesoDesdeBluetooth);
+                } else if(caracteristicaBascula.properties.read) {
+                    actualizarPesoDesdeBluetooth({target:{value:await caracteristicaBascula.readValue()}});
+                }
+                document.getElementById('estado-bascula').textContent='Conectada';
+                document.getElementById('estado-bascula').className='px-2 py-2 rounded bg-green-100 text-green-700 text-xs';
+                mostrarAlerta('Báscula Bluetooth conectada');
+            } catch(e) { console.error(e); mostrarAlerta('No se pudo conectar a la báscula: '+(e.message||'error Bluetooth'),'error'); }
+        }
+
+        function desconectarBasculaBluetooth() {
+            try { if(dispositivoBascula?.gatt?.connected) dispositivoBascula.gatt.disconnect(); } catch(e){}
+            dispositivoBascula=null; caracteristicaBascula=null; pesoActualBasculaKg=0;
+            const peso=document.getElementById('peso-bascula'), estado=document.getElementById('estado-bascula');
+            if(peso) peso.textContent='0,000 kg';
+            if(estado){estado.textContent='Desconectada';estado.className='px-2 py-2 rounded bg-gray-100 text-gray-600 text-xs';}
+        }
+
+        function renderConfig() {
+            document.getElementById('conf-nombre').value = configuracion.nombreTienda;
+            document.getElementById('conf-nif').value = configuracion.nifTienda;
+            document.getElementById('conf-direccion').value = configuracion.direccionTienda;
+            document.getElementById('conf-ble-service').value = configuracion.bleServiceUuid || '';
+            document.getElementById('conf-ble-characteristic').value = configuracion.bleCharacteristicUuid || '';
+            document.getElementById('conf-serial-baud').value = String(configuracion.serialBaudRate || 9600);
+            document.getElementById('conf-serial-formato').value = configuracion.serialFormato || 'auto';
+            document.getElementById('conf-serial-paridad').value = configuracion.serialParity || 'none';
+            document.getElementById('conf-serial-stop').value = String(configuracion.serialStopBits || 1);
+            document.getElementById('conf-backup-diario').checked = configuracion.backupDiario !== false;
+            document.getElementById('conf-backup-descarga-cierre').checked = configuracion.backupDescargaCierre !== false;
+            actualizarPanelBackups();
+            actualizarDisplayCantidad();
+        }
+
+        function guardarConfig() {
+            configuracion.nombreTienda = document.getElementById('conf-nombre').value.trim();
+            configuracion.nifTienda = document.getElementById('conf-nif').value.trim();
+            configuracion.direccionTienda = document.getElementById('conf-direccion').value.trim();
+            configuracion.bleServiceUuid = document.getElementById('conf-ble-service').value.trim();
+            configuracion.bleCharacteristicUuid = document.getElementById('conf-ble-characteristic').value.trim();
+            configuracion.serialBaudRate = Number(document.getElementById('conf-serial-baud').value) || 9600;
+            configuracion.serialFormato = document.getElementById('conf-serial-formato').value || 'auto';
+            configuracion.serialParity = document.getElementById('conf-serial-paridad').value || 'none';
+            configuracion.serialStopBits = Number(document.getElementById('conf-serial-stop').value) || 1;
+            configuracion.backupDiario = document.getElementById('conf-backup-diario').checked;
+            configuracion.backupDescargaCierre = document.getElementById('conf-backup-descarga-cierre').checked;
+            registrarCambio('CONFIGURACION', 'Configuración del TPV modificada');
+            guardarEnStorage('configuracion');
+            document.getElementById('app-title').textContent = configuracion.nombreTienda;
+            mostrarAlerta('Configuración guardada correctamente');
+        }
+        setInterval(comprobarBackupDiario, 60 * 60 * 1000);
+
+    </script>
+</body>
+</html>

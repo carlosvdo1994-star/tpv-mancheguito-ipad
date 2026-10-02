@@ -1,0 +1,26 @@
+TPV SUPER EL MANCHEGUITO — EDICIÓN IPHONE/iPAD
+
+OBJETIVO
+Esta carpeta conserva el TPV HTML original y lo prepara como Web App/PWA para iPhone/iPad.
+
+IMPORTANTE
+No abras index.html desde la app Archivos esperando que funcione como una aplicación. iOS puede mostrarlo como vista previa.
+
+PARA USARLO
+1. Publica esta carpeta en un servidor HTTPS (por ejemplo tu hosting).
+2. Abre la dirección HTTPS con Safari en iPhone/iPad.
+3. Inicia el TPV y prueba las funciones.
+4. En Safari usa Compartir > Añadir a pantalla de inicio / Abrir como app web.
+5. Desde el icono de la pantalla de inicio se abrirá como una aplicación web independiente.
+
+DEMO
+El botón “iPad” del encabezado aparece en dispositivos Apple y abre un diagnóstico de almacenamiento, impresión, Bluetooth, puerto serie e Internet.
+
+HARDWARE
+- Lectores de códigos que funcionan como teclado HID normalmente pueden usarse escribiendo en el campo SKU/código.
+- Impresión: el TPV puede usar el diálogo de impresión del sistema; para impresora térmica directa hay que confirmar si es AirPrint o integrar el SDK/protocolo del fabricante.
+- Báscula Bluetooth: el navegador no garantiza Web Bluetooth en iPadOS; para conexión directa se necesita la versión nativa iOS.
+- Báscula CAS por RS-232/USB: requiere una capa nativa iOS y un adaptador compatible.
+
+VERSIÓN NATIVA
+Se puede envolver este mismo TPV con Capacitor para crear una app iOS/iPadOS y añadir plugins nativos para impresión, Bluetooth y serie sin reescribir el TPV. La compilación iOS requiere macOS + Xcode o un servicio de build en la nube.
